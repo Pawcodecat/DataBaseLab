@@ -3,8 +3,9 @@ CREATE OR REPLACE PROCEDURE
                      ID_osoby OSOBY.ID_OSOBY%TYPE)
 AS
     istnieje_osoba     INT;
-    dostępna_wycieczka     INT;
+    dostępna_wycieczka   INT;
     istnieje_rezerwacja INT;
+    ID_nowej_rezerwacji INT;
 BEGIN
     -- sprawdź czy osoba istnieje, jeśli tak to istnieje_osoba  > 0
     SELECT COUNT(*) INTO istnieje_osoba FROM OSOBY WHERE OSOBY.ID_OSOBY = DODAJ_REZERWACJE.ID_osoby;
@@ -33,13 +34,17 @@ BEGIN
     IF istnieje_rezerwacja > 0 THEN
         RAISE_APPLICATION_ERROR(-20004, 'Rezerwacja owyczieczki o podanym id istnieje dla osoby o podanym id');
     END IF;
+    SET TRANSACTION READ WRITE;
 
+        INSERT INTO REZERWACJE (ID_WYCIECZKI, ID_OSOBY, STATUS)
+        VALUES (DODAJ_REZERWACJE.ID_wycieczki, DODAJ_REZERWACJE.ID_osoby, 'N')
+        RETURNING NR_REZERWACJI INTO ID_nowej_rezerwacji;
 
-    INSERT INTO REZERWACJE (ID_WYCIECZKI, ID_OSOBY, STATUS)
-    VALUES (DODAJ_REZERWACJE.ID_wycieczki, DODAJ_REZERWACJE.ID_osoby, 'N');
-
+        INSERT INTO REZERWACJE_LOG (ID_REZERWACJI, DATA, STATUS)
+        VALUES (ID_nowej_rezerwacji, CURRENT_DATE, 'N');
 
     COMMIT;
+    ROLLBACK;
 END;
 
 CREATE OR REPLACE PROCEDURE
@@ -87,19 +92,23 @@ BEGIN
                                         'Status potwierdzonej i zapłaconej rezerwacji ("Z") może być zmieniony tylko' ||
                                         'na "A" (odwołany).');
             END IF;
-        WHEN stary_status = 'N'
-            THEN
+
 
         ELSE
             RAISE_APPLICATION_ERROR(-20999, 'Błąd wewnętrzny aplikacji');
         END CASE;
 
-    UPDATE REZERWACJE
-    SET STATUS = ZMIEN_STATUS_REZERWACJI.status
-    WHERE NR_REZERWACJI = ZMIEN_STATUS_REZERWACJI.ID_rezerwacji;
+    SET TRANSACTION READ WRITE;
+        UPDATE REZERWACJE
+        SET STATUS = ZMIEN_STATUS_REZERWACJI.status
+        WHERE NR_REZERWACJI = ZMIEN_STATUS_REZERWACJI.ID_rezerwacji;
+
+        INSERT INTO REZERWACJE_LOG (ID_REZERWACJI, DATA, STATUS)
+        VALUES (ZMIEN_STATUS_REZERWACJI.ID_rezerwacji, CURRENT_DATE, ZMIEN_STATUS_REZERWACJI.status);
 
 
     COMMIT;
+    ROLLBACK;
 END;
 
 CREATE OR REPLACE PROCEDURE
@@ -119,13 +128,15 @@ BEGIN
         raise_application_error(-20007,
                                 'Nowa liczba miejsc jest za mała (mniejsza od 0 lub mniejsza niż liczba zarezerwowanych miejsc');
     END IF;
-
+    SET TRANSACTION READ WRITE;
     UPDATE WYCIECZKI
     SET LICZBA_MIEJSC = ZMIEN_LICZBE_MIEJSC.nowa_liczba_miejsc
     WHERE ID_WYCIECZKI = ZMIEN_LICZBE_MIEJSC.ID_wycieczki;
 
 
     COMMIT;
+    ROLLBACK;
+
 
 -- złap wyjątek i wypisz komunikat o błędzie
 EXCEPTION

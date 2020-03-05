@@ -3,7 +3,7 @@ select * from table(uczestnicy_wycieczki(4))
 select * from table(rezerwacje_osoby(5));
 
 BEGIN
-     DODAJ_REZERWACJE (6,1);
+     DODAJ_REZERWACJE (6,2);
 END;
 
 BEGIN
