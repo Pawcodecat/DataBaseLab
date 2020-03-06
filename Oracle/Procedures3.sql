@@ -1,25 +1,13 @@
-CREATE OR REPLACE PROCEDURE Przelicz AS
-  BEGIN
-    UPDATE WYCIECZKI w
-    SET LICZBA_WOLNYCH_MIEJSC = LICZBA_MIEJSC - (SELECT COUNT(*)
-                                                 FROM REZERWACJE r
-                                                 WHERE r.ID_WYCIECZKI = w.ID_WYCIECZKI
-                                                   AND r.STATUS <> 'A')
-    WHERE LICZBA_MIEJSC >= 0;
-  END;
-commit;
-
 CREATE OR REPLACE PROCEDURE
-    DODAJ_REZERWACJE2(ID_wycieczki WYCIECZKI.ID_WYCIECZKI%TYPE,
+    DODAJ_REZERWACJE3(ID_wycieczki WYCIECZKI.ID_WYCIECZKI%TYPE,
                      ID_osoby OSOBY.ID_OSOBY%TYPE)
 AS
     istnieje_osoba     INT;
     dostępna_wycieczka   INT;
     istnieje_rezerwacja INT;
-    ID_nowej_rezerwacji INT;
 BEGIN
     -- sprawdź czy osoba istnieje, jeśli tak to istnieje_osoba  > 0
-    SELECT COUNT(*) INTO istnieje_osoba FROM OSOBY WHERE OSOBY.ID_OSOBY = DODAJ_REZERWACJE2.ID_osoby;
+    SELECT COUNT(*) INTO istnieje_osoba FROM OSOBY WHERE OSOBY.ID_OSOBY = DODAJ_REZERWACJE3.ID_osoby;
 
     IF istnieje_osoba = 0 THEN
         RAISE_APPLICATION_ERROR(-20002, 'Nie znaleziono osoby z tym ID.');
@@ -29,7 +17,7 @@ BEGIN
     SELECT COUNT(*)
     INTO dostępna_wycieczka
     FROM WYCIECZKIDOSTĘPNE
-    WHERE WYCIECZKIDOSTĘPNE.ID_WYCIECZKI = DODAJ_REZERWACJE2.ID_wycieczki;
+    WHERE WYCIECZKIDOSTĘPNE.ID_WYCIECZKI = DODAJ_REZERWACJE3.ID_wycieczki;
 
     IF dostępna_wycieczka = 0 THEN
         RAISE_APPLICATION_ERROR(-20003, 'Wycieczka z tym ID nie jest dostępna');
@@ -39,8 +27,8 @@ BEGIN
     SELECT COUNT(*)
     INTO istnieje_rezerwacja
     FROM REZERWACJE
-    WHERE REZERWACJE.ID_WYCIECZKI = DODAJ_REZERWACJE2.ID_wycieczki
-      AND REZERWACJE.ID_OSOBY = DODAJ_REZERWACJE2.ID_osoby;
+    WHERE REZERWACJE.ID_WYCIECZKI = DODAJ_REZERWACJE3.ID_wycieczki
+      AND REZERWACJE.ID_OSOBY = DODAJ_REZERWACJE3.ID_osoby;
 
     IF istnieje_rezerwacja > 0 THEN
         RAISE_APPLICATION_ERROR(-20004, 'Rezerwacja owyczieczki o podanym id istnieje dla osoby o podanym id');
@@ -48,21 +36,14 @@ BEGIN
     SET TRANSACTION READ WRITE;
 
         INSERT INTO REZERWACJE (ID_WYCIECZKI, ID_OSOBY, STATUS)
-        VALUES (DODAJ_REZERWACJE2.ID_wycieczki, DODAJ_REZERWACJE2.ID_osoby, 'N')
-        RETURNING NR_REZERWACJI INTO ID_nowej_rezerwacji;
+        VALUES (DODAJ_REZERWACJE3.ID_wycieczki, DODAJ_REZERWACJE3.ID_osoby, 'N');
 
-        INSERT INTO REZERWACJE_LOG (ID_REZERWACJI, DATA, STATUS)
-        VALUES (ID_nowej_rezerwacji, CURRENT_DATE, 'N');
-
-        UPDATE WYCIECZKI
-        SET LICZBA_WOLNYCH_MIEJSC = LICZBA_WOLNYCH_MIEJSC -1
-        WHERE ID_WYCIECZKI = DODAJ_REZERWACJE2.ID_wycieczki;
     COMMIT;
     ROLLBACK;
 END;
 
 CREATE OR REPLACE PROCEDURE
-    ZMIEN_STATUS_REZERWACJI2(ID_rezerwacji REZERWACJE.NR_REZERWACJI%TYPE,
+    ZMIEN_STATUS_REZERWACJI3(ID_rezerwacji REZERWACJE.NR_REZERWACJI%TYPE,
                             status REZERWACJE.STATUS%TYPE)
 AS
     stary_status  REZERWACJE.STATUS%TYPE;
@@ -74,13 +55,13 @@ BEGIN
     INTO wycieczka_istnieje
     FROM WYCIECZKIDOSTĘPNE wp
              JOIN REZERWACJE r ON wp.ID_WYCIECZKI = r.ID_WYCIECZKI
-    WHERE r.ID_WYCIECZKI = ZMIEN_STATUS_REZERWACJI2.ID_rezerwacji;
+    WHERE r.ID_WYCIECZKI = ZMIEN_STATUS_REZERWACJI3.ID_rezerwacji;
 
     IF wycieczka_istnieje = 0 THEN
         RAISE_APPLICATION_ERROR(-20005, 'Nie znaleziono wycieczki z tym ID');
     END IF;
 
-    SELECT STATUS INTO stary_status FROM REZERWACJE r WHERE r.NR_REZERWACJI = ZMIEN_STATUS_REZERWACJI2.ID_REZERWACJI;
+    SELECT STATUS INTO stary_status FROM REZERWACJE r WHERE r.NR_REZERWACJI = ZMIEN_STATUS_REZERWACJI3.ID_REZERWACJI;
 
     -- status 'N' (nowy) może być zmieniony na każdy status
     -- status 'P' (potwierdzony) może być zmieniony na status 'Z' lub 'A'
@@ -94,15 +75,15 @@ BEGIN
             THEN RAISE_APPLICATION_ERROR(-20006, 'Status A odwołanej rezerwacji nie może być zmieniony');
 
         WHEN stary_status = 'P'
-            THEN IF (ZMIEN_STATUS_REZERWACJI2.status <> 'Z'
-                AND ZMIEN_STATUS_REZERWACJI2.status <> 'A') THEN
+            THEN IF (ZMIEN_STATUS_REZERWACJI3.status <> 'Z'
+                AND ZMIEN_STATUS_REZERWACJI3.status <> 'A') THEN
                 RAISE_APPLICATION_ERROR(-20006,
                                         'Status potwierdzonej rezerwacji może być zmieniony' ||
                                         'na "Z" (potwierdzona i zapłacona) lub "A" (odwołana).');
             END IF;
 
         WHEN stary_status = 'Z'
-            THEN IF ZMIEN_STATUS_REZERWACJI2.status <> 'A' THEN
+            THEN IF ZMIEN_STATUS_REZERWACJI3.status <> 'A' THEN
                 RAISE_APPLICATION_ERROR(-20006,
                                         'Status potwierdzonej i zapłaconej rezerwacji ("Z") może być zmieniony tylko' ||
                                         'na "A" (odwołany).');
@@ -113,7 +94,7 @@ BEGIN
             RAISE_APPLICATION_ERROR(-20999, 'Błąd wewnętrzny aplikacji');
         END CASE;
 
-    IF ZMIEN_STATUS_REZERWACJI2.status = 'A' THEN
+    IF ZMIEN_STATUS_REZERWACJI3.status = 'A' THEN
         nowe_miejsce := 1;
     ELSE
         nowe_miejsce :=0;
@@ -121,23 +102,15 @@ BEGIN
 
     SET TRANSACTION READ WRITE;
         UPDATE REZERWACJE
-        SET STATUS = ZMIEN_STATUS_REZERWACJI2.status
-        WHERE NR_REZERWACJI = ZMIEN_STATUS_REZERWACJI2.ID_rezerwacji;
-
-        INSERT INTO REZERWACJE_LOG (ID_REZERWACJI, DATA, STATUS)
-        VALUES (ZMIEN_STATUS_REZERWACJI2.ID_rezerwacji, CURRENT_DATE, ZMIEN_STATUS_REZERWACJI2.status);
-
-        UPDATE WYCIECZKI w
-        SET LICZBA_WOLNYCH_MIEJSC = LICZBA_WOLNYCH_MIEJSC + nowe_miejsce
-        WHERE ID_WYCIECZKI = (SELECT ID_WYCIECZKI FROM REZERWACJE r
-                              WHERE r.NR_REZERWACJI = ZMIEN_STATUS_REZERWACJI2.ID_rezerwacji);
+        SET STATUS = ZMIEN_STATUS_REZERWACJI3.status
+        WHERE NR_REZERWACJI = ZMIEN_STATUS_REZERWACJI3.ID_rezerwacji;
 
     COMMIT;
     ROLLBACK;
 END;
 
 CREATE OR REPLACE PROCEDURE
-    ZMIEN_LICZBE_MIEJSC2(ID_wycieczki WYCIECZKI.ID_WYCIECZKI%TYPE,
+    ZMIEN_LICZBE_MIEJSC3(ID_wycieczki WYCIECZKI.ID_WYCIECZKI%TYPE,
                         nowa_liczba_miejsc WYCIECZKI.LICZBA_MIEJSC%TYPE)
 AS
     zarezerwowane_miejsca INT;
@@ -146,18 +119,17 @@ BEGIN
     SELECT w.LICZBA_MIEJSC - w.LICZBA_WOLNYCH_MIEJSC
     INTO zarezerwowane_miejsca
     FROM WYCIECZKI w
-    WHERE w.ID_WYCIECZKI = ZMIEN_LICZBE_MIEJSC2.ID_wycieczki;
+    WHERE w.ID_WYCIECZKI = ZMIEN_LICZBE_MIEJSC3.ID_wycieczki;
 
-    IF nowa_liczba_miejsc < 0 OR zarezerwowane_miejsca > nowa_liczba_miejsc
+    IF ZMIEN_LICZBE_MIEJSC3.nowa_liczba_miejsc < 0 OR zarezerwowane_miejsca > ZMIEN_LICZBE_MIEJSC3.nowa_liczba_miejsc
     THEN
         raise_application_error(-20007,
                                 'Nowa liczba miejsc jest za mała (mniejsza od 0 lub mniejsza niż liczba zarezerwowanych miejsc');
     END IF;
     SET TRANSACTION READ WRITE;
     UPDATE WYCIECZKI
-    SET LICZBA_MIEJSC = ZMIEN_LICZBE_MIEJSC2.nowa_liczba_miejsc,
-        LICZBA_WOLNYCH_MIEJSC = LICZBA_WOLNYCH_MIEJSC + (ZMIEN_LICZBE_MIEJSC2.nowa_liczba_miejsc - LICZBA_MIEJSC)
-    WHERE ID_WYCIECZKI = ZMIEN_LICZBE_MIEJSC2.ID_wycieczki;
+    SET LICZBA_MIEJSC = ZMIEN_LICZBE_MIEJSC3.nowa_liczba_miejsc
+    WHERE ID_WYCIECZKI = ZMIEN_LICZBE_MIEJSC3.ID_wycieczki;
 
 
     COMMIT;
@@ -169,4 +141,3 @@ EXCEPTION
     WHEN NO_DATA_FOUND THEN
         RAISE_APPLICATION_ERROR(-20000, 'Nie znaleziono wycieczki z tym ID');
 END;
-

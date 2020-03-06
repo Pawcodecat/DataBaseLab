@@ -81,7 +81,7 @@ FUNCTION rezerwacje_osoby(id_osoby INT)
                WYCIECZKI.DATA < dostępne_wycieczki.data_do;
 
         IF istnieje = 0 THEN
-          raise_application_error(-20002, 'Nie znaleziono osoby o podanym id');
+          raise_application_error(-20002, 'Nie znaleziono wycieczki');
         END IF;
 
         SELECT WYCIECZKA(w.ID_WYCIECZKI, w.NAZWA,w.KRAJ, w.DATA, w.OPIS ,
