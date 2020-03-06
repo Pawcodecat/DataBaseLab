@@ -62,7 +62,11 @@ FUNCTION rezerwacje_osoby(id_osoby INT)
     FROM WYCIECZKI w
            JOIN REZERWACJE r ON w.ID_WYCIECZKI = r.ID_WYCIECZKI
            JOIN OSOBY o ON r.ID_OSOBY = o.ID_OSOBY
-    WHERE o.ID_OSOBY = rezerwacje_osoby.id_osoby AND r.STATUS <> 'A';
+    WHERE o.ID_OSOBY = rezerwacje_osoby.id_osoby AND r.STATUS <> 'A'
+    AND w.LICZBA_MIEJSC > (
+        SELECT COUNT(*)
+        FROM REZERWACJE
+        WHERE r.STATUS <> 'A' AND r.ID_WYCIECZKI = w.ID_WYCIECZKI);
     return v_ret;
   end rezerwacje_osoby;
 
